@@ -100,6 +100,7 @@ cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Queensbo
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "West 60th St"] = "W 60th St"
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "West Side Highway at 60th St"] = "12th Ave"
 cong_vehicle_zone_df %>% glimpse() # check it
+
 # FINALLY merge location data into vehicle entry data
 merged_cong <- left_join(cong_vehicle_zone_df, road_intersections, by = "road_name")
 glimpse(merged_cong) # check it
