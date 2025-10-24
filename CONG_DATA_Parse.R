@@ -30,21 +30,22 @@ cong_road_df = readRDS(cong_roads_path)
 # try to detect strings
 if (any(grepl("Bridge", cong_road_df$fullname))){print("hell yeah")}
 
-#cong_road_df[grepl("Joe", cong_road_df$fullname), ] # Filter columns to only display values that contain string
+cong_road_df[grepl("12th", cong_road_df$fullname), ] # Filter columns to only display values that contain string
 # List of strings used to find matches: Brooklyn, Manhattan, Hugh, 60, East St, 
 # based on this search Brooklyn Bridge is actually Brooklyn Brg
 # Hugh L. Carey Tunnel is Hugh L Carey Tunl
 # Manhattan Bridge is Manhattan Brg
 # Williamsburg Bridge is Williamsburg Brg
 # East 60th St is E 60th St
-# FDR Drive is Fdr Dr	
+# FDR Drive is Fdr Drive Svc Rd E and not Fdr Dr confirmed in visual
 ###  Note for this one specificaly it is FDR Drive intersects East 60th st
 # Holland Tunnel is Holland Tunl
 # Lincoln Tunnel is Lincoln Tunnel (Toll Rd)
 # Queens Midtown Tunnel is Queens Midtown Tunl
 # Queensboro Bridge is Queensboro Brg	
 # West 60th St is W 60th St
-# West Side Highway at 60th St is Joe Dimaggio Hwy
+# West Side Highway at 60th St is actually 12 avenue, which yields a lot of geometries so this 
+# has to be filtered by getting the 12th avenue that intersects with the congestion zone
 # Note this would have to be where Joe Dimaggio intersects with W 60th st
 ####
 # Now that we have a translation for the vehicle data locations we can join on those names to give the congestion data spatial data
@@ -58,35 +59,35 @@ tmp_map$road_name = c(
   "Manhattan Brg",
   "Williamsburg Brg",
   "E 60th St",
-  "Fdr Dr",
+  "Fdr Drive Svc Rd E", #"Fdr Dr",
   "Holland Tunl",
   "Lincoln Tunnel (Toll Rd)",
   "Queens Midtown Tunl",
   "Queensboro Brg",
   "W 60th St",
-  "Joe Dimaggio Hwy"
+  "12th Ave"#"Henry Hudson Pkwy"#"Joe Dimaggio Hwy"
 )
+# Checkout how we did
 tmp_map
+cong_road_df = cong_road_df %>% rename(road_name=fullname) # rename columns to avoid conflicts and to be common name for joins
+road_loc <- left_join(tmp_map, cong_road_df, by = "road_name") # take the road name map and join the location data into it
+road_loc %>% glimpse() # See how we did
+road_loc = road_loc %>% group_by(road_name) %>% # lots of geometries, consolidate it
+  summarize(
+    geometry = st_union(geometry) # sum up the geometries into one
+  )
+road_loc_sf = st_as_sf(road_loc) # Convert to spatial frame
+road_loc_sf %>% glimpse() # check it
+cong_zones_df_sf = st_as_sf(cong_zones_df) # convert to spatial frame
+road_intersections = st_intersection(road_loc_sf,cong_zones_df) # Get geometries that intersect with congestion zone only
+road_intersections %>% glimpse() # check it
+# This specific road is not detected as an intersection so add manually
+road_intersections = rbind(road_intersections,road_loc_sf[road_loc_sf$road_name == "Fdr Drive Svc Rd E",])
 
-#cong_vehicle_zone_df$road_name = NA
-#i = 1 # R is one based
-#for (gp in cong_vehicle_zone_df$detection_group) {
-#    j = 1
-#    for (rd in tmp_map$cong_name){
-#        if (gp == rd ){
-#              cong_vehicle_zone_df$road_name[i] = tmp_map$road_name[j]
-#        }
-#        j = j + 1
-#    }
-#
-#    i = i + 1
-#}
-##merged_aqi_df <- left_join(aqi_df, aqi_sites_df, by = "aqs_id_full")
-#
-#cong_vehicle_zone_df
-# This is way faster than the for loop
-cong_vehicle_zone_df$road_name = NA
-cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Brooklyn Bridge"] = "Brooklyn Brg"
+# Add in road names that can be looked up in join for vehical entry data
+cong_vehicle_zone_df$road_name = NA # create empty column
+# Translate detection group name to the road names we can use
+cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Brooklyn Bridge"] = "Brooklyn Brg" 
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Hugh L. Carey Tunnel"] = "Hugh L Carey Tunl"
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Manhattan Bridge"] = "Manhattan Brg"
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Williamsburg Bridge"] = "Williamsburg Brg"
@@ -97,19 +98,24 @@ cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Lincoln 
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Queens Midtown Tunnel"] = "Queens Midtown Tunl"
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Queensboro Bridge"] = "Queensboro Brg"
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "West 60th St"] = "W 60th St"
-cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "West Side Highway at 60th St"] = "Joe Dimaggio Hwy"
-#cong_vehicle_zone_df["road_name"] <- ifelse(cong_vehicle_zone_df$detection_group == "Brooklyn Bridge" , "Brooklyn Brg", NA)
-#cong_vehicle_zone_df["road_name"] <- ifelse(cong_vehicle_zone_df$detection_group == "Hugh L. Carey Tunnel" , "Hugh L Carey Tunl")
-cong_vehicle_zone_df %>% glimpse()
+cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "West Side Highway at 60th St"] = "12th Ave"
+cong_vehicle_zone_df %>% glimpse() # check it
+# FINALLY merge location data into vehicle entry data
+merged_cong <- left_join(cong_vehicle_zone_df, road_intersections, by = "road_name")
+glimpse(merged_cong) # check it
+# FANCY VISUALS TIMMEEE!!!!!! 
+# This will confirm we have a set of locations that actually make sense
+ggplot(road_intersections)+
+  geom_sf(colour = "red")+
+  geom_sf_label(aes(label = road_name), colour = "black", alpha=.3,size=2)+
+  geom_sf(data = cong_zones_df_sf,colour = "yellow",alpha = .5)
 
-cong_road_df = cong_road_df %>% rename(road_name=fullname) # rename columns to avoid conflicts
-merged_cong <- left_join(cong_vehicle_zone_df, cong_road_df, by = "road_name", relationship = "many-to-many")
+# Save off the data
+saveRDS(road_intersections, file="Data/vehicle_entry_locations.rds")
+saveRDS(merged_cong, file="Data/merged_cong.rds")
 
-glimpse(merged_cong)
-road_loc <- left_join(tmp_map, cong_road_df, by = "road_name", relationship = "many-to-many")
-road_loc %>% glimpse()
-# We need to now join the congestion data to the sensor data
-# For each of the locations found above for the traffic entries we should find the county of the locatoin
-# For each of the locations found aboce for the traffic entires we should find the nearest 5 sensors to use
-
+rm(list = ls())
+# Now try to read that shiiiii
+test = readRDS("Data/vehicle_entry_locations.rds")
+test2 = readRDS("Data/merged_cong.rds")
 
