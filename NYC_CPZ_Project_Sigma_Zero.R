@@ -91,9 +91,6 @@ sites_sf    = master_data$aqi_sites  # Site data
 cpz_sf      = master_data$cong_zones # CPZ zone
 counties    = master_data$aqi_counties # counties
 
-
-# ---------------- EXPERIMENTING BELOW THIS LINE ----------------
-
 # make sure both layers are sf + share the same CRS
 if (!inherits(sites_sf, "sf")) sites_sf = sf::st_as_sf(sites_sf)
 if (!inherits(cpz_sf,   "sf")) cpz_sf   = sf::st_as_sf(cpz_sf)
@@ -181,3 +178,60 @@ ggplot(aqi_inside_cpz)+
   geom_sf(data = aqi_nyc_metro$geometry,colour = "green",alpha = .5)+
   geom_sf(colour = "red")
   
+# Adding the pre & post flags to the aqi data
+panel_2x2 = aqi_data_nyc_metro %>%
+  dplyr::mutate(
+    post = as.integer(date >= CPZDate)   # 1 = on/after policy date
+  ) %>%
+  dplyr::filter(!is.na(pm25), !is.na(treated), !is.na(post))
+
+print(table(panel_2x2$treated, useNA = "ifany"))
+print(table(panel_2x2$post,    useNA = "ifany"))
+print(table(panel_2x2$treated, panel_2x2$post, useNA = "ifany"))
+
+# Meaning the treated and controls x Pre/Post groups of PM2.5
+means_tbl = panel_2x2 %>%
+  dplyr::group_by(treated, post) %>%
+  dplyr::summarise(mean_pm25 = mean(pm25, na.rm = TRUE), .groups = "drop") %>%
+  dplyr::mutate(
+    group  = ifelse(treated == 1, "CPZ - Treated", "Control"),
+    period = ifelse(post == 1, "Post", "Pre") 
+  ) %>%
+  dplyr::select(group, period, mean_pm25) %>%
+  tidyr::complete(group = c("CPZ - Treated","Control"),
+                  period = c("Pre","Post"),
+                  fill = list(mean_pm25 = NA_real_)) %>%
+  tidyr::pivot_wider(names_from = period, values_from = mean_pm25) %>%
+  dplyr::mutate(Diff = Post - Pre)
+
+
+print(means_tbl)
+# calculating the mean difference of treated and control change
+treated_change = means_tbl %>% dplyr::filter(group == "CPZ - Treated") %>% dplyr::pull(Diff)
+control_change = means_tbl %>% dplyr::filter(group == "Control") %>% dplyr::pull(Diff)
+did_hand       = treated_change - control_change
+
+#reporting the percent change vs treated
+treated_pre = means_tbl %>% dplyr::filter(group == "CPZ - Treated") %>% dplyr::pull(Pre)
+pct_change  = 100 * did_hand / treated_pre
+
+message(
+  "2×2 DiD (means): ΔCPZ = ", round(treated_change, 3),
+  ", ΔControl = ", round(control_change, 3),
+  " DiD = ", round(did_hand, 3), " µg/m³ (",
+  round(pct_change, 1), "% of CPZ pre-mean)"
+)
+
+# Plotting the results
+plot_2x2 = means_tbl %>%
+  tidyr::pivot_longer(c(Pre, Post), names_to = "period", values_to = "mean_pm25") %>%
+  dplyr::mutate(period = factor(period, levels = c("Pre","Post"))) %>%
+  ggplot(aes(x = period, y = mean_pm25, group = group, color = group)) +
+  geom_point(size = 3) +
+  geom_line(linewidth = 0.8) +
+  labs(title = "2×2 Means of PM2.5 (NYC Metro)",
+       subtitle = paste("Policy date =", as.character(CPZDate)),
+       x = NULL, y = "Mean PM2.5 (µg/m³)", color = NULL) +
+  theme_minimal()
+print(plot_2x2)
+
