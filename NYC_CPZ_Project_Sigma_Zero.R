@@ -89,7 +89,7 @@ aqi_raw     = master_data$aqi_csv    # Air Quality
 weather_raw = master_data$weather    # Weather
 sites_sf    = master_data$aqi_sites  # Site data
 cpz_sf      = master_data$cong_zones # CPZ zone
-
+counties    = master_data$aqi_counties # counties
 
 
 # ---------------- EXPERIMENTING BELOW THIS LINE ----------------
@@ -165,7 +165,19 @@ ggplot() +
   labs(title = "AQI Monitors vs. CPZ",
        subtitle = "Red = inside CPZ, Gray = outside") +
   theme_minimal()
+# Only consider data from certain counties for now
+ny_metro = counties %>% filter(state == "NY") %>% filter(
+  name=="Bronx County" | name=="New York County" | name =="Queens County" |
+    name=="Kings County")
+aqi_nyc_metro = st_intersection(st_as_sf(sites_map),st_as_sf(ny_metro))
+aqi_data_nyc_metro = aqi_df %>% filter(aqs_id_full %in% aqi_nyc_metro$aqs_id_full )
 # Split data from at date when CPZ went into effect, Jan 5th 2025
 CPZDate = as.Date("2025-01-05") # day CPZ went into effect
-aqi_df_split = split(aqi_df,aqi_df$date < CPZDate) # Split DF into before and after
-
+aqi_df_split = split(aqi_data_nyc_metro,aqi_data_nyc_metro$date < CPZDate) # Split DF into before and after
+# For plotting get sensors in the zone
+aqi_inside_cpz = st_intersection(st_as_sf(sites_map),st_as_sf(cpz_sf))
+ggplot(aqi_inside_cpz)+
+  geom_sf(data = cpz_sf,colour = "yellow",alpha = .5)+
+  geom_sf(data = aqi_nyc_metro$geometry,colour = "green",alpha = .5)+
+  geom_sf(colour = "red")
+  
