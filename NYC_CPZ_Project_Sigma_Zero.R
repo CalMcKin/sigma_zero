@@ -11,7 +11,7 @@
 # ! ! ! IMPORTANT ! ! ! #
 # Script MUST be run locally due to memory limitations. 
 # ! ! ! IMPORTANT ! ! ! #
-
+#install.packages("glue")
 # Hides start-up package messages & loads necessary libraries
 suppressPackageStartupMessages({
   library(tidyverse)  # readr, dplyr, tibble, stringr
@@ -165,4 +165,7 @@ ggplot() +
   labs(title = "AQI Monitors vs. CPZ",
        subtitle = "Red = inside CPZ, Gray = outside") +
   theme_minimal()
+# Split data from at date when CPZ went into effect, Jan 5th 2025
+CPZDate = as.Date("2025-01-05") # day CPZ went into effect
+aqi_df_split = split(aqi_df,aqi_df$date < CPZDate) # Split DF into before and after
 
