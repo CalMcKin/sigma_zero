@@ -234,4 +234,5 @@ plot_2x2 = means_tbl %>%
        x = NULL, y = "Mean PM2.5 (µg/m³)", color = NULL) +
   theme_minimal()
 print(plot_2x2)
-
+did_model <- lm(pm25 ~ post + treated + (post*treated), data = panel_2x2)
+summary(did_model)
