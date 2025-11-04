@@ -122,7 +122,41 @@ sites_tag = sites_sf %>%
 # Sanity check - show both 0 and 1 (51 controls, 5 treated)
 print(table(sites_tag$treated, useNA = "ifany"))
 
+# Ensure counties is an sf object and has the same CRS as cpz_sf
+if (!inherits(counties, "sf")) counties = sf::st_as_sf(counties)
+if (is.na(sf::st_crs(counties))) counties = sf::st_set_crs(counties, 4326)
+if (sf::st_crs(counties) != sf::st_crs(cpz_sf)) {
+  counties = sf::st_transform(counties, sf::st_crs(cpz_sf))
+}
+# Get bounding box of CPZ zone and expand it slightly to include surrounding counties
+cpz_bbox = sf::st_bbox(cpz_sf)
+# Expand the bounding box by 0.1 degrees (approximately 11 km) to include surrounding counties
+cpz_bbox_expanded = cpz_bbox + c(-0.1, -0.1, 0.1, 0.1)
+names(cpz_bbox_expanded) = c("xmin", "ymin", "xmax", "ymax")
+# Create a polygon from the expanded bounding box
+bbox_polygon = sf::st_as_sfc(cpz_bbox_expanded)
+# Filter counties that intersect with the expanded bounding box and are in NY state only
+counties_surrounding = counties %>%
+  dplyr::filter(state == "NY") %>%
+  dplyr::filter(lengths(sf::st_intersects(., bbox_polygon)) > 0)
+# Create plot of counties surrounding the CPZ zone
+plot_counties_cpz = ggplot() +
+  geom_sf(data = counties_surrounding, fill = "lightblue", color = "darkblue", alpha = 0.3, linewidth = 0.5) +
+  geom_sf(data = cpz_sf, fill = "yellow", color = "orange", alpha = 0.7, linewidth = 1) +
+  geom_sf_text(data = counties_surrounding, aes(label = name), size = 3, colour = "darkblue", fontface = "bold") +
+  theme_minimal() +
+  theme(panel.grid = element_blank()) +
+  labs(title = "Counties Surrounding the Congestion Pricing Zone",
+       subtitle = "CPZ Zone highlighted in yellow")
 
+# Save the counties plot
+ggsave("plots/plot_counties_cpz.png", plot_counties_cpz, width = 10, height = 10, dpi = 300)
+# Limit the counties to the ones we will use
+counties_surrounding = counties %>%
+filter(state == "NY") %>% filter(
+    name=="Bronx County" | name=="New York County" | name =="Queens County" |
+    name=="Kings County") %>%
+  dplyr::filter(lengths(sf::st_intersects(., bbox_polygon)) > 0)
 # Get shape data for the sites_map
 sites_map = sites_sf %>%
   dplyr::mutate(aqs_id_full = norm_id(aqs_id_full)) %>%
@@ -134,6 +168,10 @@ CPZDate = as.Date("2025-01-05") # day CPZ went into effect
 aqi_df_split = split(aqi_data_nyc_metro,aqi_data_nyc_metro$date < CPZDate) # Split DF into before and after
 # For plotting get sensors in the zone
 aqi_inside_cpz = st_intersection(st_as_sf(sites_map),st_as_sf(cpz_sf))
+# Only consider data from certain counties for now
+ny_metro = counties %>% filter(state == "NY") %>% filter(
+  name=="Bronx County" | name=="New York County" | name =="Queens County" |
+    name=="Kings County")
 # get NYC metro sites
 aqi_nyc_metro = st_intersection(st_as_sf(sites_map),st_as_sf(ny_metro))
 # Get only the sites in the aqi_data_nyc_metro
@@ -150,6 +188,20 @@ plot_site_names=ggplot(aqi_inside_cpz)+
   geom_sf_text(data = aqi_inside_cpz, aes(label = site_name.y), size = 2.5, colour = "darkred", nudge_y = 0.001)
   #geom_sf_label(data = vehicle_entry_locations,aes(label = road_name), colour = "black", alpha=.3,size=2,nudge_y = -0.004,nudge_x = -0.004)
 
+# Plot the sensors and congestion zone.
+plot_site_county=ggplot(aqi_inside_cpz)+
+  geom_sf(data = cpz_sf,colour = "yellow",alpha = .5)+
+  geom_sf(data = aqi_nyc_metro,colour = "green",alpha = .5)+
+  geom_sf(data = aqi_inside_cpz, colour = "red")+
+  geom_sf(data = vehicle_entry_locations, colour = "blue", alpha = .5)+
+  geom_sf(data = counties_surrounding, fill = "lightblue", color = "darkblue", alpha = 0.1, linewidth = 0.5) +
+  geom_sf_text(data = counties_surrounding, aes(label = name), size = 3, colour = "darkblue", fontface = "bold") 
+  #geom_sf_text(data = aqi_nyc_metro, aes(label = site_name.y), size = 2.5, colour = "darkgreen", nudge_y = 0.001)+
+  #geom_sf_text(data = aqi_inside_cpz, aes(label = site_name.y), size = 2.5, colour = "darkred", nudge_y = 0.001)
+  #geom_sf_label(data = vehicle_entry_locations,aes(label = road_name), colour = "black", alpha=.3,size=2,nudge_y = -0.004,nudge_x = -0.004)
+
+
+
 plot_road_names=ggplot(aqi_inside_cpz)+
   geom_sf(data = cpz_sf,colour = "yellow",alpha = .5)+
   #geom_sf(data = aqi_nyc_metro,colour = "green",alpha = .5)+
@@ -157,8 +209,13 @@ plot_road_names=ggplot(aqi_inside_cpz)+
   geom_sf(data = vehicle_entry_locations, colour = "blue", alpha = .5)+
   #geom_sf_text(data = aqi_nyc_metro, aes(label = site_name.y), size = 2.5, colour = "darkgreen", nudge_y = 0.001)+
   #geom_sf_text(data = aqi_inside_cpz, aes(label = site_name.y), size = 2.5, colour = "darkred", nudge_y = 0.001)
-  geom_sf_label(data = vehicle_entry_locations,aes(label = road_name), colour = "black", alpha=.3,size=1,nudge_y = -0.001,nudge_x = -0.001)
+  geom_sf_label(data = vehicle_entry_locations,aes(label = road_name), colour = "black", alpha=.3,size=3,nudge_y = -0.001,nudge_x = -0.001)
 
 # Save the plots with high resolution so labels can be seen
 ggsave("plots/plot_site_names.png", plot_site_names, width = 10, height = 10, dpi = 300)
+ggsave("plots/plot_site_county.png", plot_site_county, width = 10, height = 10, dpi = 300)
 ggsave("plots/plot_road_names.png", plot_road_names, width = 10, height = 10, dpi = 300)
+
+
+
+
