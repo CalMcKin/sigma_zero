@@ -318,8 +318,8 @@ gen_ctrl_plot(wig_a24_wicpz,"date")
 
 
 # Option 2: Save individual plots for each site
-# Get unique site names
-unique_sites = unique(aqi_data_nyc_metro$site_name)
+# Get unique site IDs
+unique_sites = unique(aqi_data_nyc_metro$aqs_id_full)
 
 # Create directory for plots if it doesn't exist
 plot_dir = here("plots", "pm25_by_site")
@@ -328,9 +328,9 @@ if (!dir_exists(plot_dir)) {
 }
 
 # Generate and save individual plots
-for (site in unique_sites) {
+for (site_id in unique_sites) {
   site_data = aqi_data_nyc_metro %>% 
-    filter(site_name == site)
+    filter(aqs_id_full == site_id)
   
   if (nrow(site_data) > 0) {
     site_plot = ggplot(data = site_data, 
@@ -340,8 +340,8 @@ for (site in unique_sites) {
       geom_vline(xintercept = as.POSIXct(CPZDate), linetype = "dashed", 
                  color = "red", size = 1) +
       labs(
-        title = paste("PM2.5 Levels:", site),
-        subtitle = paste("Site ID:", unique(site_data$aqs_id_full), 
+        title = paste("PM2.5 Levels - Site ID:", site_id),
+        subtitle = paste("Site Name:", unique(site_data$site_name), 
                          "| Treatment:", ifelse(unique(site_data$treated) == 1, "Treated", "Control")),
         x = "Date",
         y = "PM2.5 (μg/m³)",
@@ -354,7 +354,7 @@ for (site in unique_sites) {
       )
     
     # Save plot
-    ggsave(filename = here(plot_dir, paste0("pm25_", gsub(" ", "_", site), ".png")),
+    ggsave(filename = here(plot_dir, paste0("pm25_", site_id, ".png")),
            plot = site_plot,
            width = 10, height = 6, dpi = 300)
   }
