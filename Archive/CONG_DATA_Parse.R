@@ -1,13 +1,3 @@
-# ==============================================================================
-# Visualize entry points into the CPZ
-# Course: SYSEN 5300 - Systems Engineering & Six Sigma
-# Group: Sigma 0 (Devin Taylor, Liam Tang, Colton Jacobucci, Caleb McKinney)
-# File: <INSERT.R>
-# Description: Data loading, cleaning, and preliminary DiD analysis for NYC CPZ
-# Created: 2025-09-14
-# Last Updated: 2025-10-23
-# ==============================================================================
-
 # Libraries
 #install.packages(c("sf","dplyr","readr","readr","lubridate"))
 #install.packages("ggplot2")
@@ -30,7 +20,6 @@ cong_zones_df = readRDS(cong_zones_path) # Create data frame for Congestion Zone
 # Merge congestion zone data
 # I don't really know how to join the sensor data to the locations. It will be with either detection_group or detection region column
 cong_vehicle_zone_df = readRDS(cong_vehicles_path) # Create a data frame from the data
-cong_vehicle_zone_df %>% glimpse()
 cong_vehicle_zone_df$detection_group %>% unique() # show the unique location in the detection_group column
 paste("#####")
 cong_vehicle_zone_df$detection_region %>% unique() # show the unique location in the detection_region column
@@ -111,6 +100,7 @@ cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "Queensbo
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "West 60th St"] = "W 60th St"
 cong_vehicle_zone_df$road_name[cong_vehicle_zone_df$detection_group == "West Side Highway at 60th St"] = "12th Ave"
 cong_vehicle_zone_df %>% glimpse() # check it
+
 # FINALLY merge location data into vehicle entry data
 merged_cong <- left_join(cong_vehicle_zone_df, road_intersections, by = "road_name")
 glimpse(merged_cong) # check it
@@ -129,5 +119,4 @@ rm(list = ls())
 # Now try to read that shiiiii
 test = readRDS("Data/vehicle_entry_locations.rds")
 test2 = readRDS("Data/merged_cong.rds")
-
 
