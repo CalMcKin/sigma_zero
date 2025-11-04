@@ -173,9 +173,9 @@ ny_metro = counties %>% filter(state == "NY") %>% filter(
   name=="Bronx County" | name=="New York County" | name =="Queens County" |
     name=="Kings County")
 # get NYC metro sites
-aqi_nyc_metro = st_intersection(st_as_sf(sites_map),st_as_sf(ny_metro))
+aqi_nyc_metro_u = st_intersection(st_as_sf(sites_map),st_as_sf(ny_metro))
 # Get only the sites in the aqi_data_nyc_metro
-aqi_nyc_metro = aqi_nyc_metro %>% filter(aqs_id_full %in% aqi_data_nyc_metro$aqs_id_full )
+aqi_nyc_metro = aqi_nyc_metro_u %>% filter(aqs_id_full %in% aqi_data_nyc_metro$aqs_id_full )
 # Add FDR to the aqi_inside_cpz
 aqi_inside_cpz = rbind(aqi_inside_cpz,sites_map %>% filter(site_name.y == "FDR"))
 # Plot the sensors and congestion zone.
@@ -191,7 +191,7 @@ plot_site_names=ggplot(aqi_inside_cpz)+
 # Plot the sensors and congestion zone.
 plot_site_county=ggplot(aqi_inside_cpz)+
   geom_sf(data = cpz_sf,colour = "yellow",alpha = .5)+
-  geom_sf(data = aqi_nyc_metro,colour = "green",alpha = .5)+
+  geom_sf(data = aqi_nyc_metro_u,colour = "green",alpha = .5)+
   geom_sf(data = aqi_inside_cpz, colour = "red")+
   geom_sf(data = vehicle_entry_locations, colour = "blue", alpha = .5)+
   geom_sf(data = counties_surrounding, fill = "lightblue", color = "darkblue", alpha = 0.1, linewidth = 0.5) +

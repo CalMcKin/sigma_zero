@@ -317,37 +317,6 @@ gen_ctrl_plot(wig_p20_wicpz,"date")
 gen_ctrl_plot(wig_a24_wicpz,"date")
 
 
-# for each site generate a plot to inspect the data
-# Create line charts for PM2.5 levels by site
-
-# Option 1: Faceted plot showing all sites in one figure (commented out)
-# pm25_by_site_faceted = ggplot(data = aqi_data_nyc_metro, 
-#                                mapping = aes(x = datetime, y = pm25, color = factor(treated))) +
-#   geom_line(alpha = 0.7, size = 0.5) +
-#   geom_vline(xintercept = as.POSIXct(CPZDate), linetype = "dashed", color = "red", size = 1) +
-#   facet_wrap(~ site_name, scales = "free_y", ncol = 4) +
-#   scale_color_manual(values = c("0" = "blue", "1" = "orange"), 
-#                      labels = c("0" = "Control", "1" = "Treated"),
-#                      name = "Treatment") +
-#   labs(
-#     title = "PM2.5 Levels by Monitoring Site Over Time",
-#     subtitle = paste("Red dashed line indicates CPZ implementation date:", CPZDate),
-#     x = "Date",
-#     y = "PM2.5 (μg/m³)",
-#     caption = "Each panel shows a different monitoring site"
-#   ) +
-#   theme_minimal() +
-#   theme(
-#     axis.text.x = element_text(angle = 45, hjust = 1, size = 8),
-#     axis.text.y = element_text(size = 8),
-#     strip.text = element_text(size = 9, face = "bold"),
-#     plot.title = element_text(size = 14, face = "bold"),
-#     plot.subtitle = element_text(size = 11),
-#     legend.position = "bottom"
-#   )
-# 
-# print(pm25_by_site_faceted)
-
 # Option 2: Save individual plots for each site
 # Get unique site names
 unique_sites = unique(aqi_data_nyc_metro$site_name)
@@ -395,7 +364,7 @@ message(glue("Saved {length(unique_sites)} individual site plots to {plot_dir}")
 
 # Glendale, Hunts point, and Williamsburg sites do not have complete datq, drop from dataset
 aqi_data_nyc_metro = aqi_data_nyc_metro %>%
-filter(site_name != "Glendale",site_name != "Hunts Point",site_name!="Williamsburg")
+filter(site_name != "Glendale",site_name != "Hunts Point",site_name!="Williamsburg", !is.na(site_name))
 # Check the data out
 glimpse(aqi_data_nyc_metro)
 # See if that helped with invalid data readings
@@ -403,3 +372,7 @@ aqi_data_nyc_metro %>% filter(pm25 < 0)
 # It DID!
 # Lets save the cleaned data
 saveRDS(aqi_data_nyc_metro, file="Data/aqi_data_nyc_metro.rds")
+# Describe the data set again!
+aqi_desc_n = aqi_data_nyc_metro$pm25 %>% describe()
+aqi_desc
+aqi_desc_n
