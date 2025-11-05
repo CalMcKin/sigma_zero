@@ -179,14 +179,116 @@ summary(did_model)
 # DID model WITH weather controls
 # Note: Weather controls help account for meteorological confounders that may 
 # affect PM2.5 levels independently of the congestion pricing policy
-did_model_weather <- lm(pm25 ~ post + treated + (post*treated) + (congestion_hours) +
+did_model_weather_simple <- lm(pm25 ~ post + treated + (post*treated) + (congestion_hours) +
                         (temp) + (humidity), 
+                        data = panel_2x2)
+summary(did_model_weather_simple)
+
+did_model_weather <- lm(pm25 ~ post + treated + (post*treated) + (congestion_hours) +
+                        (temp) + (humidity) + dew + precip + windspeed + winddir + cloudcover
+                        + solarradiation + uvindex, 
                         data = panel_2x2)
 summary(did_model_weather)
 
+
 # Model comparison table
 modelsummary::modelsummary(
-  list("Baseline DiD" = did_model, "DiD with Weather Controls" = did_model_weather),
+  list("Baseline DiD" = did_model, "DiD with Weather Controls" = did_model_weather_simple, "DiD w Weather Controls 2" = did_model_weather ),
   stars = TRUE,
-  title = "Difference-in-Differences Models: With and Without Weather Controls (including Congestion Zone Hours fixed effect)"
+  title = "Difference-in-Differences Models: With and Without Weather Controls (including Congestion Zone Hours fixed effect)",
+
 )
+
+#######################################
+###########PLACEBO TEST SECTION########
+#######################################
+
+# Placebo test: Test for treatment effects using a fake treatment date
+# before the actual CPZ implementation. If there's a significant effect
+# at the fake date, it suggests violations of parallel trends assumption.
+
+# Set placebo date (e.g., 1year before actual CPZ date)
+placebo_date = as.Date("2024-01-05")  # 1 year before CPZDate
+
+# Create placebo panel using only pre-treatment data (before actual CPZ date)
+# This ensures we're testing whether there were differences before the policy
+panel_placebo = aqi_data_nyc_metro %>%
+  dplyr::filter(date < as.Date("2025-01-05")) %>%  # Only use data before actual treatment
+  dplyr::mutate(
+    post_placebo = as.integer(date >= placebo_date),  # Fake treatment indicator
+    weekday = lubridate::wday(datetime, label = FALSE)
+  ) %>%
+  dplyr::mutate(
+    # Congestion zone hours: Weekdays (Mon-Fri, wday 2-6) 5am-9pm, Weekends (Sat-Sun, wday 1,7) 9am-9pm
+    congestion_hours = dplyr::case_when(
+      weekday %in% c(2:6) & hour >= 5 & hour < 21 ~ 1L,   # Weekdays: 5am-9pm (hour 5-20)
+      weekday %in% c(1, 7) & hour >= 9 & hour < 21 ~ 1L,  # Weekends: 9am-9pm (hour 9-20)
+      TRUE ~ 0L
+    )
+  ) %>%
+  dplyr::left_join(weather_df, by = c("aqs_id_full", "datetime")) %>%
+  dplyr::mutate(
+    invalid_reading = as.integer(!is.na(pm25) & pm25 < 0)
+  ) %>%
+  dplyr::filter(!is.na(pm25), !is.na(treated), !is.na(post_placebo))
+
+# Report on placebo test sample size
+message(glue("\nPlacebo test using fake treatment date: {placebo_date}"))
+message(glue("Placebo test sample size: {nrow(panel_placebo)} observations"))
+message(glue("Pre-placebo period: {min(panel_placebo$date)} to {placebo_date - 1}"))
+message(glue("Post-placebo period: {placebo_date} to {max(panel_placebo$date)}"))
+
+# Placebo DiD model WITHOUT weather controls (baseline)
+placebo_did_model <- lm(pm25 ~ post_placebo + treated + (post_placebo*treated) + congestion_hours, 
+                        data = panel_placebo)
+summary(placebo_did_model)
+
+# Placebo DiD model WITH simple weather controls
+placebo_did_model_weather_simple <- lm(pm25 ~ post_placebo + treated + (post_placebo*treated) + congestion_hours +
+                                       temp + humidity, 
+                                       data = panel_placebo)
+summary(placebo_did_model_weather_simple)
+
+# Placebo DiD model WITH all weather controls
+placebo_did_model_weather <- lm(pm25 ~ post_placebo + treated + (post_placebo*treated) + congestion_hours +
+                                temp + humidity + dew + precip + windspeed + winddir + cloudcover +
+                                solarradiation + uvindex, 
+                                data = panel_placebo)
+summary(placebo_did_model_weather)
+
+# Placebo test results table
+modelsummary::modelsummary(
+  list("Baseline Placebo" = placebo_did_model, 
+       "Placebo w/ Simple Weather" = placebo_did_model_weather_simple, 
+       "Placebo w/ Full Weather" = placebo_did_model_weather),
+  stars = TRUE,
+  title = "Placebo Test: DiD Models Using Fake Treatment Date (2024-01-05) - Should Show No Effect"
+)
+
+# Extract and compare treatment effect coefficients
+# The interaction term (post_placebo*treated) should be statistically insignificant
+# if parallel trends assumption holds
+placebo_coefs = data.frame(
+  Model = c("Baseline Placebo", "Placebo w/ Simple Weather", "Placebo w/ Full Weather"),
+  Coefficient = c(
+    coef(placebo_did_model)["post_placebo:treated"],
+    coef(placebo_did_model_weather_simple)["post_placebo:treated"],
+    coef(placebo_did_model_weather)["post_placebo:treated"]
+  ),
+  P_Value = c(
+    summary(placebo_did_model)$coefficients["post_placebo:treated", "Pr(>|t|)"],
+    summary(placebo_did_model_weather_simple)$coefficients["post_placebo:treated", "Pr(>|t|)"],
+    summary(placebo_did_model_weather)$coefficients["post_placebo:treated", "Pr(>|t|)"]
+  )
+)
+
+print("\n=== Placebo Test Results Summary ===")
+print(placebo_coefs)
+
+# Interpretation: If p-values are > 0.05, this supports the parallel trends assumption
+# If p-values are < 0.05, it suggests pre-existing differences between treated and control groups
+if (any(placebo_coefs$P_Value < 0.05, na.rm = TRUE)) {
+  message("\n⚠️  WARNING: Significant placebo effects detected. This may indicate violations of parallel trends assumption.")
+} else {
+  message("\n✓ Placebo test passed: No significant effects at fake treatment date. Parallel trends assumption appears valid.")
+}
