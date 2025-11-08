@@ -243,3 +243,191 @@ modelsummary::modelsummary(
   stars = TRUE,
   output = ("tables/modelsummary_results.csv")
 )
+
+#######################################
+###########DiD PLOTS SECTION##########
+#######################################
+
+# Ensure plots directory exists
+if (!dir_exists("plots")) {
+  dir_create("plots")
+  message("Created plots/ directory")
+}
+
+# Prepare simplified DiD plot data
+# Calculate mean PM2.5 for each group (treated/control) in each period (pre/post)
+did_simple_data = model_1_data %>%
+  dplyr::mutate(
+    treated_label = dplyr::if_else(treated == 1, "Treated (Inside CPZ)", 
+                                    "Control (Outside CPZ)"),
+    period_label = dplyr::if_else(post == 0, "Pre-Treatment", "Post-Treatment"),
+    period_numeric = dplyr::if_else(post == 0, 0, 1)  # 0 = pre, 1 = post
+  ) %>%
+  dplyr::group_by(treated_label, period_label, period_numeric, treated, post) %>%
+  dplyr::summarise(
+    mean_pm25 = mean(pm25, na.rm = TRUE),
+    se_pm25 = sd(pm25, na.rm = TRUE) / sqrt(n()),
+    n_obs = n(),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    upper_ci = mean_pm25 + 1.96 * se_pm25,
+    lower_ci = mean_pm25 - 1.96 * se_pm25
+  )
+
+# Create simplified DiD plot
+did_simple_plot = ggplot2::ggplot(did_simple_data, 
+                                   ggplot2::aes(x = period_numeric, 
+                                                y = mean_pm25, 
+                                                color = treated_label,
+                                                group = treated_label)) +
+  ggplot2::geom_line(linewidth = 1.5, alpha = 0.7) +
+  ggplot2::geom_point(size = 4, shape = 19) +
+  ggplot2::geom_errorbar(ggplot2::aes(ymin = lower_ci, ymax = upper_ci), 
+                         width = 0.05, linewidth = 1) +
+  ggplot2::scale_x_continuous(
+    breaks = c(0, 1),
+    labels = c("Pre-Treatment", "Post-Treatment"),
+    limits = c(-0.1, 1.1)
+  ) +
+  ggplot2::scale_color_manual(values = c("Treated (Inside CPZ)" = "#E74C3C", 
+                                         "Control (Outside CPZ)" = "#3498DB")) +
+  ggplot2::labs(
+    title = "Difference-in-Differences: PM2.5 by Treatment Status",
+    subtitle = "Average PM2.5 before and after CPZ implementation (with 95% CI)",
+    x = "Period",
+    y = "Average PM2.5 (μg/m³)",
+    color = "Group",
+    caption = "Treatment date: January 5, 2025"
+  ) +
+  ggplot2::theme_minimal() +
+  ggplot2::theme(
+    plot.title = ggplot2::element_text(size = 14, face = "bold", hjust = 0.5),
+    plot.subtitle = ggplot2::element_text(size = 12, hjust = 0.5),
+    plot.caption = ggplot2::element_text(size = 9, hjust = 0.5),
+    legend.position = "bottom",
+    legend.title = ggplot2::element_text(face = "bold"),
+    axis.title = ggplot2::element_text(size = 11, face = "bold"),
+    axis.text.x = ggplot2::element_text(size = 10),
+    panel.grid.minor = ggplot2::element_blank()
+  )
+
+# Save the simplified plot
+ggplot2::ggsave("plots/did_plot_simple.png", 
+                plot = did_simple_plot, 
+                width = 10, 
+                height = 7, 
+                dpi = 300)
+
+print(did_simple_plot)
+
+# Calculate and display the DiD estimate
+did_estimate = did_simple_data %>%
+  dplyr::select(treated_label, period_label, mean_pm25) %>%
+  tidyr::pivot_wider(names_from = period_label, values_from = mean_pm25) %>%
+  dplyr::mutate(
+    change = `Post-Treatment` - `Pre-Treatment`
+  )
+
+message("\n=== DiD Summary ===")
+print(did_estimate)
+
+# Calculate DiD coefficient
+treated_pre = did_estimate$`Pre-Treatment`[did_estimate$treated_label == "Treated (Inside CPZ)"]
+treated_post = did_estimate$`Post-Treatment`[did_estimate$treated_label == "Treated (Inside CPZ)"]
+control_pre = did_estimate$`Pre-Treatment`[did_estimate$treated_label == "Control (Outside CPZ)"]
+control_post = did_estimate$`Post-Treatment`[did_estimate$treated_label == "Control (Outside CPZ)"]
+
+did_coef = (treated_post - treated_pre) - (control_post - control_pre)
+message(glue("\nDiD Estimate (from plot): {round(did_coef, 3)} μg/m³"))
+message(glue("Treated change: {round(treated_post - treated_pre, 3)} μg/m³"))
+message(glue("Control change: {round(control_post - control_pre, 3)} μg/m³"))
+
+message("\n✓ Simplified DiD plot saved to plots/did_plot_simple.png")
+
+panel_2x2 = model_1_data
+# Meaning the treated and controls x Pre/Post groups of PM2.5
+means_tbl = panel_2x2 %>%
+  dplyr::group_by(treated, post) %>%
+  dplyr::summarise(mean_pm25 = mean(pm25, na.rm = TRUE), .groups = "drop") %>%
+  dplyr::mutate(
+    group  = ifelse(treated == 1, "CPZ - Treated", "Control"),
+    period = ifelse(post == 1, "Post", "Pre") 
+  ) %>%
+  dplyr::select(group, period, mean_pm25) %>%
+  tidyr::complete(group = c("CPZ - Treated","Control"),
+                  period = c("Pre","Post"),
+                  fill = list(mean_pm25 = NA_real_)) %>%
+  tidyr::pivot_wider(names_from = period, values_from = mean_pm25) %>%
+  dplyr::mutate(Diff = Post - Pre)
+
+
+print(means_tbl)
+# calculating the mean difference of treated and control change
+treated_change = means_tbl %>% dplyr::filter(group == "CPZ - Treated") %>% dplyr::pull(Diff)
+control_change = means_tbl %>% dplyr::filter(group == "Control") %>% dplyr::pull(Diff)
+did_hand       = treated_change - control_change
+
+#reporting the percent change vs treated
+treated_pre = means_tbl %>% dplyr::filter(group == "CPZ - Treated") %>% dplyr::pull(Pre)
+pct_change  = 100 * did_hand / treated_pre
+
+message(
+  "2×2 DiD (means): ΔCPZ = ", round(treated_change, 3),
+  ", ΔControl = ", round(control_change, 3),
+  " DiD = ", round(did_hand, 3), " µg/m³ (",
+  round(pct_change, 1), "% of CPZ pre-mean)"
+)
+inter = 17.51709
+post = -1.77825
+treated = -8.09942
+did = -0.74844
+
+mean_tbl2 =data.frame(
+  group = c("Control","Treated"),
+  post = c(inter+post,inter+did),
+  pre = c(inter,inter+treated)
+) %>% mutate (
+  diff = post-pre
+)
+mean_tbl2$diff[1] - mean_tbl2$diff[2]
+print(mean_tbl2)
+coeffs = coef(did_model_weather)
+intercept = coeffs["(Intercept)"]
+post = coeffs["post"]
+treated = coeffs["treated"]
+diddy_treatment = coeffs["post:treated"]
+did_model_weather_m_tbl = data.frame(
+  group = c("Control","Treated"),
+  Post = c(intercept+post,intercept+post+treated+diddy_treatment),
+  Pre = c(intercept, intercept+treated)
+)%>% mutate(
+  diff = Post-Pre
+)
+-1.3738064 --0.3499375
+
+print(did_model_weather_m_tbl)
+# post control = intercept - post
+# control pre = intercept
+# treatet pre = intercept - treated
+# treated post = intercept - treated - post-did
+# Plotting the results
+plot_2x2 = did_model_weather_m_tbl %>%
+  tidyr::pivot_longer(c(Pre, Post), names_to = "period", values_to = "mean_pm25") %>%
+  dplyr::mutate(period = factor(period, levels = c("Pre","Post"))) %>%
+  ggplot(aes(x = period, y = mean_pm25, group = group, color = group)) +
+  geom_point(size = 3) +
+  geom_line(linewidth = 0.8) +
+  labs(title = "2×2 Means of PM2.5 (NYC Metro)",
+       subtitle = paste("Policy date =", as.character(CPZDate)),
+       x = NULL, y = "Mean PM2.5 (µg/m³)", color = NULL) +
+  theme_minimal()
+print(plot_2x2)
+# Save the simplified plot
+ggplot2::ggsave("plots/plot_2x2.png", 
+                plot = plot_2x2, 
+                width = 10, 
+                height = 7, 
+                dpi = 300)
+did_model <- lm(pm25 ~ post + treated + (post*treated), data = panel_2x2)
+summary(did_model)
