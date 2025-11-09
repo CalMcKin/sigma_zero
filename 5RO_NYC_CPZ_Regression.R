@@ -294,6 +294,8 @@ ggplot2::ggsave("plots/plot_2x2.png",
                 height = 7, 
                 dpi = 300)
 # Make a more complicated but nicer plot
+# Based on this tutorial sent from heaven
+#   https://rpubs.com/phle/r_tutorial_difference_in_differences
 # Intervention value for plotting - Control Group
 interven1 = (intercept+intercept+post)/2
 # Intervention value for plotting - Treatment Counterfactual
