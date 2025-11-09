@@ -225,6 +225,23 @@ did_model_weather <- lm(pm25 ~ post + treated + (post * treated) + congestion_ho
 summary(did_model_weather)
 
 
+# Confidence intervals for model coefficients
+conf_int <- confint(did_model_weather, level = 0.99)
+print("99% Confidence Intervals for DiD Model Coefficients:")
+print(conf_int)
+
+# Extract the DiD coefficient (interaction term) and its confidence interval
+did_coef_name <- "post:treated"
+did_coef <- coef(did_model_weather)[did_coef_name]
+did_conf_int <- confint(did_model_weather, parm = did_coef_name, level = 0.99)
+message(
+  "\nDiD Effect (post:treated): ",
+  round(did_coef, 3),
+  " µg/m³\n",
+  "99% CI: [", round(did_conf_int[1], 3), ", ", round(did_conf_int[2], 3), "]"
+)
+
+
 # Model comparison table
 # Display in console
 modelsummary::modelsummary(
