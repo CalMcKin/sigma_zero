@@ -1,10 +1,15 @@
 # ==============================================================================
-# Calculate Descriptive Stats for Project
+# Descriptive Statistics and Data Cleaning
 # Course: SYSEN 5300 - Systems Engineering & Six Sigma
 # Group: Sigma 0 (Devin Taylor, Liam Tang, Colton Jacobucci, Caleb McKinney)
-# File: <INSERT.R>
-# Description: Data loading, cleaning. Visualize data.
-#              Clean data.
+# File: 3RO_NYC_CPZ_Descriptive_Stats.R
+# Description: Data cleaning and descriptive statistics pipeline. Processes raw air 
+#              quality data, tags monitoring sites as treated (inside CPZ) or control 
+#              (outside CPZ), filters to NYC metro area (Bronx, Manhattan, Queens, 
+#              Kings counties), removes incomplete sites and invalid readings. 
+#              Generates control charts, summary statistics, and individual PM2.5 
+#              time series plots for each monitoring site. Outputs cleaned dataset 
+#              as aqi_data_nyc_metro.rds.
 # Created: 2025-09-14
 # Last Updated: 2025-10-23
 # ==============================================================================

@@ -1,9 +1,14 @@
 # ==============================================================================
-# Project Activity – Preliminary Results
+# Data Investigation: Placebo Test Feasibility
 # Course: SYSEN 5300 - Systems Engineering & Six Sigma
 # Group: Sigma 0 (Devin Taylor, Liam Tang, Colton Jacobucci, Caleb McKinney)
-# File: <INSERT.R>
-# Description: Check to see if Placebo test is feasible
+# File: 2RO_NYC_DATA_Investigation_NoPlacebo.R
+# Description: Checks feasibility of placebo test for DiD analysis. Loads air quality 
+#              and congestion pricing zone data, identifies monitoring sites inside 
+#              and outside the CPZ, creates visualization plots of site locations. 
+#              Determines that placebo test is not feasible due to insufficient 
+#              pre-2019 data for sites inside the CPZ zone (earliest data starts 
+#              June 2019, insufficient for meaningful placebo analysis).
 # Created: 2025-09-14
 # Last Updated: 2025-10-23
 # ==============================================================================

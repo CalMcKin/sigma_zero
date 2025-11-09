@@ -1,9 +1,14 @@
 # ==============================================================================
-# Project Activity – Preliminary Results
+# Spatial Visualization Maps
 # Course: SYSEN 5300 - Systems Engineering & Six Sigma
 # Group: Sigma 0 (Devin Taylor, Liam Tang, Colton Jacobucci, Caleb McKinney)
-# File: <INSERT.R>
-# Description: Plot some stuff.
+# File: 4RO_NYC_CPZ_Plots.R
+# Description: Creates spatial visualization maps showing the geographic layout of 
+#              the analysis. Generates plots displaying the congestion pricing zone, 
+#              air quality monitoring sites (treated and control groups), vehicle 
+#              entry locations, and surrounding counties. Outputs high-resolution 
+#              PNG files: plot_site_names.png, plot_site_ids.png, plot_site_county.png, 
+#              plot_road_names.png, and plot_counties_cpz.png.
 # Created: 2025-09-14
 # Last Updated: 2025-10-23
 # ==============================================================================

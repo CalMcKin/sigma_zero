@@ -1,9 +1,16 @@
 # ==============================================================================
-# Project Activity – Preliminary Results
+# Difference-in-Differences Regression Analysis
 # Course: SYSEN 5300 - Systems Engineering & Six Sigma
 # Group: Sigma 0 (Devin Taylor, Liam Tang, Colton Jacobucci, Caleb McKinney)
-# File: <INSERT.R>
-# Description: Data loading, cleaning, and preliminary DiD analysis for NYC CPZ
+# File: 5RO_NYC_CPZ_Regression.R
+# Description: Performs difference-in-differences (DiD) regression analysis to estimate 
+#              the causal effect of congestion pricing on PM2.5 air quality. Creates 
+#              treatment/post indicators based on CPZ implementation date (January 5, 2025), 
+#              incorporates congestion zone hours, weather controls, and site type controls. 
+#              Estimates DiD models with baseline, simple weather, and full weather 
+#              specifications. Generates model comparison tables, confidence intervals, 
+#              and 2x2 DiD visualization plots. Outputs: modelsummary_results.csv, 
+#              plot_2x2.png, and plot_nice.png.
 # Created: 2025-09-14
 # Last Updated: 2025-10-23
 # ==============================================================================

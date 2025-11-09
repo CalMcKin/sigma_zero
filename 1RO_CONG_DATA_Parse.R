@@ -1,10 +1,15 @@
 # ==============================================================================
-# Visualize entry points into the CPZ
+# Parse Congestion Pricing Vehicle Entry Data
 # Course: SYSEN 5300 - Systems Engineering & Six Sigma
 # Group: Sigma 0 (Devin Taylor, Liam Tang, Colton Jacobucci, Caleb McKinney)
-# File: <INSERT.R>
-# Description: Parse the congestion zone aqi sites and road entry sites to 
-#              to create a visualizer
+# File: 1RO_CONG_DATA_Parse.R
+# Description: Parses congestion pricing vehicle entry data and maps detection 
+#              groups to road names. Creates spatial geometries for vehicle entry 
+#              locations by matching detection group names (e.g., "Brooklyn Bridge", 
+#              "FDR Drive at 60th St") to road geometries in the congestion zone. 
+#              Outputs: vehicle_entry_locations.rds (spatial locations of entry points) 
+#              and merged_cong.rds (vehicle entry data with location information).
+# Created: 2025-09-14
 # Last Updated: 2025-10-23
 # ==============================================================================
 
