@@ -230,6 +230,12 @@ did_model_weather <- lm(pm25 ~ post + treated + (post * treated) + congestion_ho
                         solarradiation + uvindex + hour + day + month+dist+site_type, 
                         data = model_1_data)
 summary(did_model_weather)
+### MESSING AROUND
+lm(pm25 ~ post + treated + (post * treated) +site_type+ temp + humidity + dew + precip + windspeed + winddir + cloudcover  + uvindex+month,
+                data = model_1_data) %>% summary()
+summary(did_model)
+
+
 
 
 # Confidence intervals for model coefficients
@@ -247,7 +253,7 @@ message(
   " µg/m³\n",
   "99% CI: [", round(did_conf_int[1], 3), ", ", round(did_conf_int[2], 3), "]"
 )
-
+confint(did_model_weather, level = 0.99)
 
 # Model comparison table
 # Display in console
@@ -271,6 +277,88 @@ modelsummary::modelsummary(
 #######################################
 ###########DiD PLOTS SECTION##########
 #######################################
+# To get the confidence intervals
+# we will need to calculate 
+# covariance to get the standard errors
+# for all the combination of estimates
+# we are interested in
+# DESCRIPTION
+# Control Pre: Intercept
+# Control Post: Intercept + Post
+# Treatment Pre: Intercept + Treated
+# Treatment Post: Intercept+Treated+Post+Interaction
+# Counterfactual Pre: Intercept + Treated (Same as Treatment PRE)
+# Counterfactual Post: Intercept + Treated + Post
+# In total I need to calculate 5 standard errors using vcov to get the covariance matrix
+cov = vcov(did_model_weather)
+c_names = names(coef(did_model_weather))
+num_cf = length(c_names)
+c_v = rep(0,num_cf)
+names(c_v) = c_names
+# For each variable in model_1_data that is also in c_v, set c_v[var] = mean(model_1_data[[var]], na.rm = TRUE)
+for (var in names(c_v)) {
+  if (var %in% names(model_1_data)) {
+    c_v[var] = mean(model_1_data[[var]], na.rm = TRUE)
+  }
+}
+c_v["(Intercept)"] = 0
+c_v["post"] = 0
+c_v["treated"] = 0
+c_v["post:treated"] = 0
+c_v_base = c_v
+##### Get Control Pre
+c_v_cpre = c_v_base
+c_v_cpre["(Intercept)"] = 1
+# Calculate the Variance of the combined estimate
+tmp_var <- t(c_v_cpre) %*% cov %*% c_v_cpre
+tmp_val <- as.numeric(tmp_var)
+SE_CPRE <- sqrt(tmp_val)
+##### Get Control Post
+c_v_cpost = c_v_base
+c_v_cpost["(Intercept)"] = 1
+c_v_cpost["post"] = 1
+# Calculate the Variance of the combined estimate
+tmp_var <- t(c_v_cpost) %*% cov %*% c_v_cpost
+tmp_val <- as.numeric(tmp_var)
+SE_CPOST <- sqrt(tmp_val)
+##### Get Treatment Pre
+c_v_tpre = c_v_base
+c_v_tpre["(Intercept)"] = 1
+c_v_tpre["treated"] = 1
+# Calculate the Variance of the combined estimate
+tmp_var <- t(c_v_tpre) %*% cov %*% c_v_tpre
+tmp_val <- as.numeric(tmp_var)
+SE_TPRE <- sqrt(tmp_val)
+##### Get Treatment POST:Intercept+Treated+Post+Interaction
+c_v_tpost = c_v_base
+c_v_tpost["(Intercept)"] = 1
+c_v_tpost["treated"] = 1
+c_v_tpost["post"] = 1
+c_v_tpost["post:treated"] = 1
+# Calculate the Variance of the combined estimate
+tmp_var <- t(c_v_tpost) %*% cov %*% c_v_tpost
+tmp_val <- as.numeric(tmp_var)
+SE_TPOST <- sqrt(tmp_val)
+# Get Counterfactual Post: Intercept + Treated + Post
+c_v_cfpost = c_v_base
+c_v_cfpost["(Intercept)"] = 1
+c_v_cfpost["treated"] = 1
+c_v_cfpost["post"] = 1
+# Calculate the Variance of the combined estimate
+tmp_var <- t(c_v_cfpost) %*% cov %*% c_v_cfpost
+tmp_val <- as.numeric(tmp_var)
+SE_CFPOST <- sqrt(tmp_val)
+
+# Get confidence intervals for the model
+confi = confint(did_model_weather, level = 0.99)
+intercept_l = confi["(Intercept)",1]
+intercept_u = confi["(Intercept)",2]
+post_l = confi["post",1]
+post_u = confi["post",2]
+treated_l = confi["treated",1]
+treated_u = confi["treated",2]
+interaction_l = confi["post:treated",1]
+interaction_u = confi["post:treated",2]
 # Get coefficients from selected model
 coeffs = coef(did_model_weather)
 # Save the needed coefficients
@@ -317,6 +405,8 @@ ggplot2::ggsave("plots/plot_2x2.png",
                 width = 10, 
                 height = 7, 
                 dpi = 300)
+
+
 # Make a more complicated but nicer plot
 # Based on this tutorial sent from heaven
 #   https://rpubs.com/phle/r_tutorial_difference_in_differences
@@ -333,20 +423,49 @@ counterfactual = data.frame(
 # Data frame for other data
 intervention = data.frame(
   obs = c("Intervention","Intervention","Intervention","Pre","Post","Pre","Post"),
-  group = c("Control","Treated","Treated(cf)","Control","Control","Treated","Treated"),
-  data = c(interven1, interven2,interven2,intercept,intercept+post,intercept+treated,intercept+post+treated+interaction)
+  group = c("Control",  "Treated",       "Treated(cf)","Control","Control","Treated","Treated"),
+  data = c(interven1,    interven2,      interven2,      intercept,intercept+post,intercept+treated,intercept+post+treated+interaction)
 )
 # Join the data together for plotting
 did_plot_data = bind_rows(counterfactual,intervention)
+
+# add confidence intervals to the data
+did_plot_data = did_plot_data %>%
+  mutate(data_l = case_when(
+    group == "Control" & obs == "Pre" ~ data - qnorm(.975)*SE_CPRE, # Pre control just intercept
+    group == "Control" & obs == "Post" ~ data - qnorm(.975)*SE_CPOST, # Post control just intercept + post
+    group == "Control" & obs == "Intervention" ~ data - qnorm(.975)*SE_CPRE, # Intervention control just intercept + post
+    group == "Treated" & obs == "Pre" ~ data - qnorm(.975)*SE_TPRE, # Pre treated just intercept + treated
+    group == "Treated" & obs == "Post" ~ data - qnorm(.975)*SE_TPOST, # Post treated just intercept + treated + post
+    group == "Treated" & obs == "Intervention" ~ data - qnorm(.975)*SE_TPRE, # Intervention treated just intercept + treated + post
+    group == "Treated(cf)" & obs == "Pre" ~ data - qnorm(.975)*SE_TPRE,
+    group == "Treated(cf)" & obs == "Post" ~ data - qnorm(.975)*SE_CFPOST,
+    group == "Treated(cf)" & obs == "Intervention" ~ data - qnorm(.975)*SE_TPRE,
+    )) %>%
+    mutate(data_u = case_when(
+    group == "Control" & obs == "Pre" ~ data + qnorm(.975)*SE_CPRE, # Pre control just intercept
+    group == "Control" & obs == "Post" ~ data + qnorm(.975)*SE_CPOST, # Post control just intercept + post
+    group == "Control" & obs == "Intervention" ~ data + qnorm(.975)*SE_CPRE, # Intervention control just intercept + post
+    group == "Treated" & obs == "Pre" ~ data + qnorm(.975)*SE_TPRE, # Pre treated just intercept + treated
+    group == "Treated" & obs == "Post" ~ data + qnorm(.975)*SE_TPOST, # Post treated just intercept + treated + post
+    group == "Treated" & obs == "Intervention" ~ data + qnorm(.975)*SE_TPRE, # Intervention treated just intercept + treated + post
+    group == "Treated(cf)" & obs == "Pre" ~ data + qnorm(.975)*SE_TPRE,
+    group == "Treated(cf)" & obs == "Post" ~ data + qnorm(.975)*SE_CFPOST,
+    group == "Treated(cf)" & obs == "Intervention" ~ data + qnorm(.975)*SE_TPRE,
+    ))
+
 # Make sure the groups are ordered so the plotting works as expected
 # Pre values first, then intervention, then post values
 did_plot_data$obs = factor(did_plot_data$obs, levels=c("Pre","Intervention","Post"))
 # Make the plot
 did_plot = did_plot_data %>%
-  ggplot(aes(x=obs,y=data, group=group)) + # aesthetic based on data
-  geom_line(aes(color=group), size=1.2) + # line plot with color based on 3 groups
+  ggplot(aes(x=obs,y=data, group=group,fill=group,ymin=data_l,ymax=data_u,color=group)) + # aesthetic based on data
+  geom_ribbon( alpha=0.1) + 
+ # geom_errorbar(position=position_dodge(width=0.5))+
+  geom_line(size=1.2) + # line plot with color based on 3 groups
   geom_vline(xintercept = "Intervention", linetype="dotted", # intervention line
-             color = "black", size=1.1) + 
+             color = "black", size=1.1) +
+
   scale_color_brewer(palette = "Accent")+ # make colors nice
   labs(x="", y="PM25 (mean)") + # Add label for y axis
   annotate( # Add nice annotation 
@@ -364,3 +483,5 @@ ggplot2::ggsave("plots/plot_nice.png",
                 width = 10, 
                 height = 7, 
                 dpi = 300)
+
+
