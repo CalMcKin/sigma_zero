@@ -432,26 +432,26 @@ did_plot_data = bind_rows(counterfactual,intervention)
 # add confidence intervals to the data
 did_plot_data = did_plot_data %>%
   mutate(data_l = case_when(
-    group == "Control" & obs == "Pre" ~ data - qnorm(.975)*SE_CPRE, # Pre control just intercept
-    group == "Control" & obs == "Post" ~ data - qnorm(.975)*SE_CPOST, # Post control just intercept + post
-    group == "Control" & obs == "Intervention" ~ data - qnorm(.975)*SE_CPRE, # Intervention control just intercept + post
-    group == "Treated" & obs == "Pre" ~ data - qnorm(.975)*SE_TPRE, # Pre treated just intercept + treated
-    group == "Treated" & obs == "Post" ~ data - qnorm(.975)*SE_TPOST, # Post treated just intercept + treated + post
-    group == "Treated" & obs == "Intervention" ~ data - qnorm(.975)*SE_TPRE, # Intervention treated just intercept + treated + post
-    group == "Treated(cf)" & obs == "Pre" ~ data - qnorm(.975)*SE_TPRE,
-    group == "Treated(cf)" & obs == "Post" ~ data - qnorm(.975)*SE_CFPOST,
-    group == "Treated(cf)" & obs == "Intervention" ~ data - qnorm(.975)*SE_TPRE,
+    group == "Control" & obs == "Pre" ~ data - qnorm(.995)*SE_CPRE, # Pre control just intercept
+    group == "Control" & obs == "Post" ~ data - qnorm(.995)*SE_CPOST, # Post control just intercept + post
+    group == "Control" & obs == "Intervention" ~ data - qnorm(.995)*SE_CPRE, # Intervention control just intercept + post
+    group == "Treated" & obs == "Pre" ~ data - qnorm(.995)*SE_TPRE, # Pre treated just intercept + treated
+    group == "Treated" & obs == "Post" ~ data - qnorm(.995)*SE_TPOST, # Post treated just intercept + treated + post
+    group == "Treated" & obs == "Intervention" ~ data - qnorm(.995)*SE_TPRE, # Intervention treated just intercept + treated + post
+    group == "Treated(cf)" & obs == "Pre" ~ data - qnorm(.995)*SE_TPRE,
+    group == "Treated(cf)" & obs == "Post" ~ data - qnorm(.995)*SE_CFPOST,
+    group == "Treated(cf)" & obs == "Intervention" ~ data - qnorm(.995)*SE_TPRE,
     )) %>%
     mutate(data_u = case_when(
-    group == "Control" & obs == "Pre" ~ data + qnorm(.975)*SE_CPRE, # Pre control just intercept
-    group == "Control" & obs == "Post" ~ data + qnorm(.975)*SE_CPOST, # Post control just intercept + post
-    group == "Control" & obs == "Intervention" ~ data + qnorm(.975)*SE_CPRE, # Intervention control just intercept + post
-    group == "Treated" & obs == "Pre" ~ data + qnorm(.975)*SE_TPRE, # Pre treated just intercept + treated
-    group == "Treated" & obs == "Post" ~ data + qnorm(.975)*SE_TPOST, # Post treated just intercept + treated + post
-    group == "Treated" & obs == "Intervention" ~ data + qnorm(.975)*SE_TPRE, # Intervention treated just intercept + treated + post
-    group == "Treated(cf)" & obs == "Pre" ~ data + qnorm(.975)*SE_TPRE,
-    group == "Treated(cf)" & obs == "Post" ~ data + qnorm(.975)*SE_CFPOST,
-    group == "Treated(cf)" & obs == "Intervention" ~ data + qnorm(.975)*SE_TPRE,
+    group == "Control" & obs == "Pre" ~ data + qnorm(.995)*SE_CPRE, # Pre control just intercept
+    group == "Control" & obs == "Post" ~ data + qnorm(.995)*SE_CPOST, # Post control just intercept + post
+    group == "Control" & obs == "Intervention" ~ data + qnorm(.995)*SE_CPRE, # Intervention control just intercept + post
+    group == "Treated" & obs == "Pre" ~ data + qnorm(.995)*SE_TPRE, # Pre treated just intercept + treated
+    group == "Treated" & obs == "Post" ~ data + qnorm(.995)*SE_TPOST, # Post treated just intercept + treated + post
+    group == "Treated" & obs == "Intervention" ~ data + qnorm(.995)*SE_TPRE, # Intervention treated just intercept + treated + post
+    group == "Treated(cf)" & obs == "Pre" ~ data + qnorm(.995)*SE_TPRE,
+    group == "Treated(cf)" & obs == "Post" ~ data + qnorm(.995)*SE_CFPOST,
+    group == "Treated(cf)" & obs == "Intervention" ~ data + qnorm(.995)*SE_TPRE,
     ))
 
 # Make sure the groups are ordered so the plotting works as expected
@@ -460,22 +460,26 @@ did_plot_data$obs = factor(did_plot_data$obs, levels=c("Pre","Intervention","Pos
 # Make the plot
 did_plot = did_plot_data %>%
   ggplot(aes(x=obs,y=data, group=group,fill=group,ymin=data_l,ymax=data_u,color=group)) + # aesthetic based on data
-  geom_ribbon( alpha=0.1) + 
+  geom_ribbon( alpha=0.5,color=NA) + 
  # geom_errorbar(position=position_dodge(width=0.5))+
   geom_line(size=1.2) + # line plot with color based on 3 groups
   geom_vline(xintercept = "Intervention", linetype="dotted", # intervention line
              color = "black", size=1.1) +
-
   scale_color_brewer(palette = "Accent")+ # make colors nice
   labs(x="", y="PM25 (mean)") + # Add label for y axis
   annotate( # Add nice annotation 
     "text",
     x = "Post",
-    y = 12.8, # this was picked visually after generating the plot
+    y = 12.86, # this was picked visually after generating the plot
     label = "{Difference-in-Differences}",
     angle = 90,
-    size = 5 # This was picked visually after generating the plot
-  )
+    size = 6 # This was picked visually after generating the plot
+  )+theme_minimal()+
+  theme(
+    legend.title = element_text(size = 16), # Change title font size
+    legend.text = element_text(size = 10),  # Change text label font size
+    legend.key.size = unit(1.5, "cm")       # Change the size of the key box/symbol
+  )+labs(fill = "Legend",color="Legend")+scale_fill_brewer(palette="Set2")+scale_color_brewer(palette="Set1")
 print(did_plot)
 # Save the simplified plot
 ggplot2::ggsave("plots/plot_nice.png", 
