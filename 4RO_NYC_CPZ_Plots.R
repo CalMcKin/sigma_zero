@@ -136,7 +136,7 @@ if (sf::st_crs(counties) != sf::st_crs(cpz_sf)) {
 # Get bounding box of CPZ zone and expand it slightly to include surrounding counties
 cpz_bbox = sf::st_bbox(cpz_sf)
 # Expand the bounding box by 0.1 degrees (approximately 11 km) to include surrounding counties
-cpz_bbox_expanded = cpz_bbox + c(-0.1, -0.1, 0.1, 0.1)
+cpz_bbox_expanded = cpz_bbox + c(-0.04, -0.04, 0.04, 0.03)
 names(cpz_bbox_expanded) = c("xmin", "ymin", "xmax", "ymax")
 # Create a polygon from the expanded bounding box
 bbox_polygon = sf::st_as_sfc(cpz_bbox_expanded)
@@ -149,7 +149,7 @@ plot_counties_cpz = ggplot() +
   geom_sf(data = counties_surrounding, fill = "lightblue", color = "darkblue", alpha = 0.3, linewidth = 0.5) +
   geom_sf(data = cpz_sf, fill = "yellow", color = "orange", alpha = 0.7, linewidth = 1) +
   geom_sf_text(data = counties_surrounding, aes(label = name), size = 3, colour = "darkblue", fontface = "bold") +
-  theme_minimal() +
+  theme_void() +
   theme(panel.grid = element_blank()) +
   labs(title = "Counties Surrounding the Congestion Pricing Zone",
        subtitle = "CPZ Zone highlighted in yellow")
@@ -186,24 +186,30 @@ aqi_nyc_metro_u = st_intersection(st_as_sf(sites_map),st_as_sf(ny_metro))
 aqi_nyc_metro = aqi_nyc_metro_u %>% filter(aqs_id_full %in% aqi_data_nyc_metro$aqs_id_full )
 # Add FDR to the aqi_inside_cpz
 aqi_inside_cpz = rbind(aqi_inside_cpz,sites_map %>% filter(site_name.y == "FDR"))
+# GET SOME NICE TEXT
+#install.packages("ggrepel")
+library(ggrepel)
 # Plot the sensors and congestion zone.
 plot_site_names=ggplot(aqi_inside_cpz)+
   geom_sf(data = cpz_sf,colour = "yellow",alpha = .5)+
   geom_sf(data = aqi_nyc_metro,colour = "green",alpha = .5)+
   geom_sf(data = aqi_inside_cpz, colour = "red")+
   geom_sf(data = vehicle_entry_locations, colour = "blue", alpha = .5)+
-  geom_sf_text(data = aqi_nyc_metro, aes(label = site_name.y), size = 2.5, colour = "darkgreen", nudge_y = 0.001)+
-  geom_sf_text(data = aqi_inside_cpz, aes(label = site_name.y), size = 2.5, colour = "darkred", nudge_y = 0.001)
+  geom_text_repel(data = aqi_nyc_metro, aes(label = site_name.y,geometry=geometry), stat = "sf_coordinates", size = 3, colour = "black", nudge_y = 0.001)+
+  theme_minimal()
+ # geom_text_repel(data = aqi_inside_cpz, aes(label = site_name.y,geometry=geometry),  stat = "sf_coordinates",size = 2.5, colour = "darkred", nudge_y = 0.001)
   #geom_sf_label(data = vehicle_entry_locations,aes(label = road_name), colour = "black", alpha=.3,size=2,nudge_y = -0.004,nudge_x = -0.004)
 
 # Plot the sensors and congestion zone.
-plot_site_county=ggplot(aqi_inside_cpz)+
-  geom_sf(data = cpz_sf,colour = "yellow",alpha = .5)+
-  geom_sf(data = aqi_nyc_metro_u,colour = "green",alpha = .5)+
+plot_site_county=ggplot(aqi_inside_cpz) +
+  geom_sf(data = counties_surrounding, fill = "lightblue", color = "darkblue", alpha = 0.5, linewidth = 0.5) +
+  geom_sf(data = cpz_sf,colour = "yellow",fill="yellow",alpha = .8) +
+  geom_sf(data = aqi_nyc_metro,colour = "orange",alpha = 1)+
   geom_sf(data = aqi_inside_cpz, colour = "red")+
   geom_sf(data = vehicle_entry_locations, colour = "blue", alpha = .5)+
-  geom_sf(data = counties_surrounding, fill = "lightblue", color = "darkblue", alpha = 0.1, linewidth = 0.5) +
-  geom_sf_text(data = counties_surrounding, aes(label = name), size = 3, colour = "darkblue", fontface = "bold") 
+  geom_text_repel(data = counties_surrounding, aes(label = name,geometry=geometry), size = 3, colour = "darkblue",stat = "sf_coordinates", fontface = "bold")+
+#geom_text_repel(data = aqi_nyc_metro, aes(label = site_name.y,geometry=geometry), stat = "sf_coordinates", size = 3, colour = "black", nudge_y = 0.001)+
+  theme_minimal()
   #geom_sf_text(data = aqi_nyc_metro, aes(label = site_name.y), size = 2.5, colour = "darkgreen", nudge_y = 0.001)+
   #geom_sf_text(data = aqi_inside_cpz, aes(label = site_name.y), size = 2.5, colour = "darkred", nudge_y = 0.001)
   #geom_sf_label(data = vehicle_entry_locations,aes(label = road_name), colour = "black", alpha=.3,size=2,nudge_y = -0.004,nudge_x = -0.004)
